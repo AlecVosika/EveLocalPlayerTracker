@@ -10,6 +10,7 @@ import numpy as np
 import pytesseract
 import pygetwindow as gw
 import pygame
+import pyttsx3
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -24,6 +25,7 @@ class ScreenTextExtractor:
         pytesseract.pytesseract.tesseract_cmd = self.tesseract_executable
         self.coords: Optional[Tuple[int, int, int, int]] = self.get_window_coordinates()
         pygame.init()
+        self.tts_engine = pyttsx3.init()
 
     def load_config(self) -> dict:
         try:
@@ -80,31 +82,55 @@ class ScreenTextExtractor:
         formatted_text = re.sub(pattern, '', extracted_text, flags=re.MULTILINE)
         return [line for line in formatted_text.split('\n') if line.strip()]
 
-    def play_sound(self, sound_file) -> None:
-        pygame.mixer.music.load(sound_file)
-        pygame.mixer.music.play()
-        while pygame.mixer.music.get_busy():  # Wait for audio to finish
-            pygame.time.Clock().tick(10)
-        return None
+    def speak_text(self, text: str) -> None:
+        """Read aloud the given text."""
+        self.tts_engine.say(text)
+        self.tts_engine.runAndWait()
     
+def calculate_and_speak_difference(self, previous_names, extracted_names) -> None:
+    """Calculate the numerical difference between the two sets and speak it, including handling None values."""
+    try:
+        # Function to clean strings and extract only digits
+        def clean_and_extract_digits(s):
+            return re.sub(r'[^\d]', '', s)  # Remove all non-digit characters
+
+        # Extracting and cleaning numbers from the sets
+        previous_numbers = [int(clean_and_extract_digits(name)) for name in previous_names if clean_and_extract_digits(name).isdigit()]
+        current_numbers = [int(clean_and_extract_digits(name)) for name in extracted_names if clean_and_extract_digits(name).isdigit()]
+
+        # Handling the case where we go from no numbers to numbers or vice versa
+        if not previous_numbers and current_numbers:
+            # From None to a number
+            current_sum = sum(current_numbers)
+            self.speak_text(f"from no value to {current_sum}")
+        elif previous_numbers and not current_numbers:
+            # From a number to None
+            previous_sum = sum(previous_numbers)
+            self.speak_text(f"from {previous_sum} to no value")
+        elif previous_numbers and current_numbers:
+            # Normal case: both previous and current captures contain numbers
+            previous_sum = sum(previous_numbers)
+            current_sum = sum(current_numbers)
+            difference = current_sum - previous_sum
+            if difference > 0:
+                self.speak_text(f"plus {difference}")
+            elif difference < 0:
+                self.speak_text(f"minus {abs(difference)}")
+            # If there is no change, you might want to say something or not.
+            else:
+                self.speak_text(f"no change")
+    except Exception as e:
+        logger.error(f"Error calculating or speaking difference: {e}")
+
     def run(self) -> None:
-        previous_names = set()  # Use a set for easier comparison of differences
+        previous_names = set()
         while True:
             img = self.capture_screenshot()
             if img is not None:
-                extracted_names = set(self.extract_text(img))  # Convert list of names to a set
+                extracted_names = set(self.extract_text(img))
                 if previous_names and extracted_names != previous_names:
-                    new_names = extracted_names - previous_names
-                    removed_names = previous_names - extracted_names
-                    changes = []
-                    if new_names:
-                        changes.append(f"New: {', '.join(new_names)}")
-                    if removed_names:
-                        changes.append(f"Removed: {', '.join(removed_names)}")
-                    changes_str = '; '.join(changes)
                     logger.info("\n Ping! Change detected.\n")
-                    logger.info(f"Changes: {changes_str}")  # Print what has changed
-                    self.play_sound('ok.mp3')
+                    self.calculate_and_speak_difference(previous_names, extracted_names)
                 previous_names = extracted_names
                 logger.info(f"\n{', '.join(extracted_names)}\n")
             else:
