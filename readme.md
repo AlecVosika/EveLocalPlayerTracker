@@ -30,6 +30,7 @@ Before running the utility, ensure you have a `config.json` file in the same dir
   "tesseract_cmd": "<path_to_tesseract_executable>",
   "app_name": "<name_of_application_window>"
 }
+```
 
 You will also need to have Tesseract OCR installed on your system. Refer to the [Tesseract at UB Mannheim](https://github.com/UB-Mannheim/tesseract/wiki) for installation instructions.
 
