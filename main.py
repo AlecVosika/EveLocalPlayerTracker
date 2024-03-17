@@ -1,87 +1,100 @@
 import json
 import re
-from time import sleep
 import logging
-from typing import Optional, Tuple, List
-
+import numpy as np
 import cv2
 import mss
-import numpy as np
 import pytesseract
 import pygetwindow as gw
-import pygame
+import pyttsx3
+from time import sleep
+from typing import Optional, Tuple, List
 
-logger = logging.getLogger(__name__)
+# Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-
-class ScreenTextExtractor:
+class ScreenNumberExtractor:
     def __init__(self, config_file: str = 'config.json') -> None:
         self.config_file: str = config_file
-        self.data = self.load_config()
-        self.tesseract_executable: str = self.data.get('tesseract_cmd', '')
-        self.app_name: str = self.data.get('app_name', '')
-        pytesseract.pytesseract.tesseract_cmd = self.tesseract_executable
-        self.coords: Optional[Tuple[int, int, int, int]] = self.get_window_coordinates()
-        pygame.init()
+        self.tesseract_cmd, self.app_name = self.load_config()
 
-    def load_config(self) -> dict:
+        pytesseract.pytesseract.tesseract_cmd = self.tesseract_cmd
+        self.window_coords: Optional[Tuple[int, int, int, int]] = self.get_window_coords()
+
+        self.tts_engine = pyttsx3.init()
+
+    def load_config(self) -> Tuple[str, str]:
         try:
             with open(self.config_file) as f:
-                return json.load(f)
+                data = json.load(f)
+            return data.get('tesseract_cmd', ''), data.get('app_name', '')
         except FileNotFoundError as e:
             logger.error(f"Config file not found: {e}")
-            return {}
+            return '', ''
 
-    def get_window_coordinates(self) -> Optional[Tuple[int, int, int, int]]:
+    def get_window_coords(self) -> Optional[Tuple[int, int, int, int]]:
         try:
-            window = gw.getWindowsWithTitle(self.app_name)[0]  # Adjust the index if needed
+            window = gw.getWindowsWithTitle(self.app_name)[0]  # Adjust index if needed
             return (window.left, window.top, window.width, window.height)
-        except IndexError:
-            logger.error("Window not found.")
-            return None
-        except Exception as e:
+        except (IndexError, Exception) as e:
             logger.error(f"Error finding window: {e}")
             return None
 
-    def capture_screenshot(self) -> Optional[np.ndarray]:
-        if self.coords:
-            monitor = {"top": self.coords[1], "left": self.coords[0], "width": self.coords[2], "height": self.coords[3]}
+    def capture_image(self) -> Optional[np.ndarray]:
+        if self.window_coords:
+            monitor = {"top": self.window_coords[1], "left": self.window_coords[0], "width": self.window_coords[2], "height": self.window_coords[3]}
             with mss.mss() as sct:
                 screenshot = sct.grab(monitor)
                 img = np.array(screenshot)
                 return cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
-        else:
-            logger.error("Coordinates not set.")
-            return None
-
-    def extract_text(self, img: np.ndarray) -> List[str]:
-        extracted_text = pytesseract.image_to_string(img)
-        pattern = r'^[^\w\s]+ '  # Matches leading special chars followed by a space
-        formatted_text = re.sub(pattern, '', extracted_text, flags=re.MULTILINE)
-        return [line for line in formatted_text.split('\n') if line.strip()]
-
-    def play_sound(self, sound_file) -> None:
-        pygame.mixer.music.load(sound_file)
-        pygame.mixer.music.play()
+        logger.error("Window coordinates not set.")
         return None
 
+    def preprocess_image(self, img: np.ndarray) -> np.ndarray:
+        img_resized = cv2.resize(img, None, fx=2, fy=2, interpolation=cv2.INTER_LINEAR)
+        denoised_img = cv2.fastNlMeansDenoisingColored(img_resized, None, 10, 10, 7, 21)
+        gray = cv2.cvtColor(denoised_img, cv2.COLOR_BGR2GRAY)
+        _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        return thresh
+
+    def extract_numbers(self, img: np.ndarray) -> List[int]:
+        preprocessed_img = self.preprocess_image(img)
+        text = pytesseract.image_to_string(preprocessed_img)
+        numbers = re.findall(r'\d+', text)
+        return list(map(int, numbers))
+
+    def speak(self, text: str) -> None:
+        self.tts_engine.say(text)
+        self.tts_engine.runAndWait()
+
+    def calculate_and_announce_difference(self, prev_numbers: List[int], current_numbers: List[int]) -> None:
+        try:
+            if prev_numbers or current_numbers:
+                difference = sum(current_numbers) - sum(prev_numbers)
+                action_word = "plus" if difference > 0 else "minus"
+                self.speak(f"{action_word} {abs(difference)}")
+        except Exception as e:
+            logger.error(f"Error calculating or speaking difference: {e}")
+
     def run(self) -> None:
-        previous_names = None
+        previous_numbers = []
         while True:
-            img = self.capture_screenshot()
+            img = self.capture_image()
             if img is not None:
-                extracted_names = self.extract_text(img)
-                if previous_names is not None and extracted_names != previous_names:
-                    logger.info("\n Ping! Change detected.\n")
-                    self.play_sound('ok.mp3')
-                previous_names = extracted_names
-                logger.info(f"\n{extracted_names}\n")
+                extracted_numbers = self.extract_numbers(img)
+                # Default to [1] if no numbers are extracted
+                if not extracted_numbers:
+                    extracted_numbers = [1]
+                if extracted_numbers != previous_numbers:
+                    logger.info("\nChange detected.\n")
+                    self.calculate_and_announce_difference(previous_numbers, extracted_numbers)
+                previous_numbers = extracted_numbers
+                logger.info(f"\nExtracted numbers: {', '.join(map(str, extracted_numbers))}\n")
             else:
-                logger.error("Unable to capture screenshot.")
+                logger.error("Unable to capture image.")
             sleep(5)
 
-
 if __name__ == "__main__":
-    screen_text_extractor = ScreenTextExtractor()
-    screen_text_extractor.run()
+    extractor = ScreenNumberExtractor()
+    extractor.run()

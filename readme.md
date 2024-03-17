@@ -1,25 +1,35 @@
-# Screen Text Extractor
+# Screen Number Extractor
 
-Screen Text Extractor is a Python utility designed for extracting text from a specified window on your desktop. It uses image processing to capture the content of a window and employs OCR (Optical Character Recognition) to convert the captured image into text. This tool is particularly useful for monitoring changes in window content, such as chat windows, system logs, or any application interface where text content updates regularly.
+The Screen Number Extractor is a Python utility designed for extracting numbers from a specified application window on your screen. It captures the window's content, processes the image to identify numbers, and uses text-to-speech to announce changes in the detected numbers. This tool integrates several powerful libraries, including OpenCV for image processing, pytesseract for OCR (Optical Character Recognition), and pyttsx3 for text-to-speech functionality.
 
 ## Features
 
-- **Window Selection**: Targets a specific window by its title for capturing screenshots.
-- **Text Extraction**: Utilizes Tesseract OCR for extracting text from images.
-- **Change Detection**: Monitors the targeted window for changes in text content and logs the differences.
-- **Sound Notification**: Plays a sound notification upon detecting changes in the text content.
-- **Flexible Configuration**: Allows customization through a configuration file, including the path to the Tesseract executable and the name of the application window to monitor.
+- Automatic detection of specified application window coordinates.
+- Real-time capture and processing of the window's content.
+- Extraction of numbers from the processed image using OCR.
+- Announcement of changes in detected numbers via text-to-speech.
 
 ## Dependencies
 
-To use Screen Text Extractor, you will need to have the following libraries installed:
+To run this utility, you need to have the following Python libraries installed:
 
-- `numpy`
-- `opencv-python` (cv2)
-- `pytesseract`
-- `mss` for screen capture
-- `pygetwindow` for targeting specific windows
-- `pygame` for playing sound notifications
+- numpy
+- opencv-python (cv2)
+- mss for screen capture
+- pytesseract for OCR
+- pygetwindow for window management
+- pyttsx3 for text-to-speech
+- Additionally, Tesseract-OCR software must be installed and its path correctly configured in `config.json`.
+
+## Configuration
+
+Before running the utility, ensure you have a `config.json` file in the same directory with the following structure:
+
+```json
+{
+  "tesseract_cmd": "<path_to_tesseract_executable>",
+  "app_name": "<name_of_application_window>"
+}
 
 You will also need to have Tesseract OCR installed on your system. Refer to the [Tesseract at UB Mannheim](https://github.com/UB-Mannheim/tesseract/wiki) for installation instructions.
 
