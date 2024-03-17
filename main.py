@@ -87,40 +87,40 @@ class ScreenTextExtractor:
         self.tts_engine.say(text)
         self.tts_engine.runAndWait()
     
-def calculate_and_speak_difference(self, previous_names, extracted_names) -> None:
-    """Calculate the numerical difference between the two sets and speak it, including handling None values."""
-    try:
-        # Function to clean strings and extract only digits
-        def clean_and_extract_digits(s):
-            return re.sub(r'[^\d]', '', s)  # Remove all non-digit characters
+    def calculate_and_speak_difference(self, previous_names, extracted_names) -> None:
+        """Calculate the numerical difference between the two sets and speak it, including handling None values."""
+        try:
+            # Function to clean strings and extract only digits
+            def clean_and_extract_digits(s):
+                return re.sub(r'[^\d]', '', s)  # Remove all non-digit characters
 
-        # Extracting and cleaning numbers from the sets
-        previous_numbers = [int(clean_and_extract_digits(name)) for name in previous_names if clean_and_extract_digits(name).isdigit()]
-        current_numbers = [int(clean_and_extract_digits(name)) for name in extracted_names if clean_and_extract_digits(name).isdigit()]
+            # Extracting and cleaning numbers from the sets
+            previous_numbers = [int(clean_and_extract_digits(name)) for name in previous_names if clean_and_extract_digits(name).isdigit()]
+            current_numbers = [int(clean_and_extract_digits(name)) for name in extracted_names if clean_and_extract_digits(name).isdigit()]
 
-        # Handling the case where we go from no numbers to numbers or vice versa
-        if not previous_numbers and current_numbers:
-            # From None to a number
-            current_sum = sum(current_numbers)
-            self.speak_text(f"from no value to {current_sum}")
-        elif previous_numbers and not current_numbers:
-            # From a number to None
-            previous_sum = sum(previous_numbers)
-            self.speak_text(f"from {previous_sum} to no value")
-        elif previous_numbers and current_numbers:
-            # Normal case: both previous and current captures contain numbers
-            previous_sum = sum(previous_numbers)
-            current_sum = sum(current_numbers)
-            difference = current_sum - previous_sum
-            if difference > 0:
-                self.speak_text(f"plus {difference}")
-            elif difference < 0:
-                self.speak_text(f"minus {abs(difference)}")
-            # If there is no change, you might want to say something or not.
-            else:
-                self.speak_text(f"no change")
-    except Exception as e:
-        logger.error(f"Error calculating or speaking difference: {e}")
+            # Handling the case where we go from no numbers to numbers or vice versa
+            if not previous_numbers and current_numbers:
+                # From None to a number
+                current_sum = sum(current_numbers)
+                self.speak_text(f"from no value to {current_sum}")
+            elif previous_numbers and not current_numbers:
+                # From a number to None
+                previous_sum = sum(previous_numbers)
+                self.speak_text(f"from {previous_sum} to no value")
+            elif previous_numbers and current_numbers:
+                # Normal case: both previous and current captures contain numbers
+                previous_sum = sum(previous_numbers)
+                current_sum = sum(current_numbers)
+                difference = current_sum - previous_sum
+                if difference > 0:
+                    self.speak_text(f"plus {difference}")
+                elif difference < 0:
+                    self.speak_text(f"minus {abs(difference)}")
+                # If there is no change, you might want to say something or not.
+                else:
+                    self.speak_text(f"no change")
+        except Exception as e:
+            logger.error(f"Error calculating or speaking difference: {e}")
 
     def run(self) -> None:
         previous_names = set()
@@ -128,6 +128,9 @@ def calculate_and_speak_difference(self, previous_names, extracted_names) -> Non
             img = self.capture_screenshot()
             if img is not None:
                 extracted_names = set(self.extract_text(img))
+                # If extracted_names is empty, default to {"1"}
+                if not extracted_names:
+                    extracted_names = {"1"}
                 if previous_names and extracted_names != previous_names:
                     logger.info("\n Ping! Change detected.\n")
                     self.calculate_and_speak_difference(previous_names, extracted_names)
@@ -136,6 +139,7 @@ def calculate_and_speak_difference(self, previous_names, extracted_names) -> Non
             else:
                 logger.error("Unable to capture screenshot.")
             sleep(5)
+
 
 if __name__ == "__main__":
     screen_text_extractor = ScreenTextExtractor()
